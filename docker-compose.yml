@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+  simplex:
+    image: privaterouterllc/simplex:latest
+    container_name: simplex
+    environment:
+      - SMP_ADDRESS=${SMP_ADDRESS:?We cannot function without your Server's Address!}
+    ports:
+      - "5223:5223"
+    volumes:
+      - "${PWD}/data/config:/etc/opt/simplex"
+      - "${PWD}/data/logs:/var/opt/simplex"

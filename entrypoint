@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Most of this was written by the SimpleX Team, we just tweaked it a bit.
+# Contact Information: ops@torguard.net
+
+# Our configuration storage directory
+DIR_CONF="/etc/opt/simplex"
+# Our logs storage directory
+DIR_LOGS="/var/opt/simplex"
+
+# We silently support the original docker implementation from SimpleX which used addr as the variable
+# If addr is set and SMP_ADDRESS is not set, we use addr as the address
+[[ ! -z "${addr}" && -z "${SMP_ADDRESS}" ]] && { echo 'Old config, using $addr as $SMP_ADDRESS'; SMP_ADDRESS="${addr}"; }
+
+# Hidden flag to force removal of all configs and settings, use with caution!
+[[ ! -z "${FORCE_INIT}" && ! -z "${SMP_ADDRESS}" ]] && {
+	echo "** NOTICE: FORCE INIT received, all settings will be REMOVED! **"
+	rm -rf ${DIR_CONF}/* ${DIR_LOGS}/*
+}
+
+# Check if we have a valid SMP_ADDRESS to generate our secure key
+[[ -z "${SMP_ADDRESS}" && ! -f "${DIR_CONF}/smp-server.ini" ]] && {
+    echo "You must pass the inbound address or IP used to access this SMP Server."
+	echo "Example 1: SMP_ADDRESS=example.com"
+	echo "Example 2: SMP_ADDRESS=123.456.789.012"
+    exit 1
+}
+
+# Check if server has been initialized
+[ ! -f "${DIR_CONF}/smp-server.ini" ] && {
+	echo "Initializing SMP Server..."
+	# If not, determine ip or domain
+	case "${SMP_ADDRESS}" in
+	    # We have a domain as it has letters
+		*[a-zA-Z]*) smp-server init -l -n ${SMP_ADDRESS} ;;
+		# No letters, so must be an IP
+		*) smp-server init -l --ip ${SMP_ADDRESS} ;;
+	esac
+	[ $? -ne 0 ] && {
+		echo "Failed to initialize SMP Server!"
+		exit 1
+	} || {
+		echo "SMP Server initialized successfully!"
+	}
+}
+
+# Fix config bug, seems server currently will not start without this edit
+echo "Applying small config fix (which may not be neccessary later)"
+sed -i 's/# check_interval: 43200/check_interval: 43200/g' /etc/opt/simplex/smp-server.ini
+
+echo "Performing log rotations"
+# backup store log
+[ -f "${DIR_LOGS}/smp-server-store.log" ] && cp ${DIR_LOGS}/smp-server-store.log ${DIR_LOGS}/smp-server-store.log.bak
+# rotate server log
+[ -f "${DIR_LOGS}/smp-server.log" ] && mv ${DIR_LOGS}/smp-server.log ${DIR_LOGS}/smp-server-$(date +'%FT%T').log
+
+# Finally, run smp-sever. Notice that "exec" here is important:
+# smp-server replaces our helper script, so that it can catch INT signal
+echo "Starting SMP Server..."
+exec smp-server start 2>&1 | tee -a ${DIR_LOGS}/smp-server.log
