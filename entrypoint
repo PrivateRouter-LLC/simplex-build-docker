@@ -31,9 +31,9 @@ DIR_LOGS="/var/opt/simplex"
 	# If not, determine ip or domain
 	case "${SMP_ADDRESS}" in
 	    # We have a domain as it has letters
-		*[a-zA-Z]*) smp-server init -l -n ${SMP_ADDRESS} ;;
+		*[a-zA-Z]*) smp-server init -l -n ${SMP_ADDRESS} -y ;;
 		# No letters, so must be an IP
-		*) smp-server init -l --ip ${SMP_ADDRESS} ;;
+		*) smp-server init -l --ip ${SMP_ADDRESS} -y ;;
 	esac
 	[ $? -ne 0 ] && {
 		echo "Failed to initialize SMP Server!"
@@ -42,10 +42,6 @@ DIR_LOGS="/var/opt/simplex"
 		echo "SMP Server initialized successfully!"
 	}
 }
-
-# Fix config bug, seems server currently will not start without this edit
-echo "Applying small config fix (which may not be neccessary later)"
-sed -i 's/# check_interval: 43200/check_interval: 43200/g' /etc/opt/simplex/smp-server.ini
 
 echo "Performing log rotations"
 # backup store log
